@@ -71,6 +71,7 @@ import com.example.ui.screens.BluetoothDevicesScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.theme.DarkCanvas
 import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.StatusGreen
