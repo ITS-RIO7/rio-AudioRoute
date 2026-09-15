@@ -83,15 +83,16 @@ fun AppRulesScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Per-App Audio Routing",
+                        text = "rio Per-App Audio Routing",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
-                        text = "Choose specifically which apps play through Bluetooth vs Phone Speaker",
+                        text = "Jis app ko aap select karenge, sirf usi app ka sound Bluetooth me aayega. Baaki sabhi apps phone speaker me bajenge.",
                         fontSize = 12.sp,
-                        color = TextSecondary
+                        color = ElectricCyan,
+                        lineHeight = 16.sp
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -173,16 +174,34 @@ fun AppRulesScreen(
                     ) {
                         Button(
                             onClick = {
-                                viewModel.batchSetCategory(AppCategory.MUSIC, RouteTarget.BLUETOOTH)
+                                viewModel.setAllAppsBluetoothRouting(true)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("batch_all_bt_button")
+                        ) {
+                            Text(
+                                text = "All -> BT",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0A0E17)
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.setMusicOnlyBluetoothRouting()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan.copy(alpha = 0.2f)),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1.2f)
                                 .testTag("batch_music_bt_button")
                         ) {
                             Text(
-                                text = "🎵 All Music -> BT",
+                                text = "🎵 Music Only",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = ElectricCyan
@@ -191,16 +210,16 @@ fun AppRulesScreen(
 
                         Button(
                             onClick = {
-                                viewModel.batchSetCategory(AppCategory.COMMUNICATION, RouteTarget.SPEAKER)
+                                viewModel.setAllAppsBluetoothRouting(false)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CallAmber.copy(alpha = 0.2f)),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
-                                .weight(1f)
-                                .testTag("batch_calls_speaker_button")
+                                .weight(1.2f)
+                                .testTag("batch_all_speaker_button")
                         ) {
                             Text(
-                                text = "📞 All Calls -> Speaker",
+                                text = "🔊 All Speaker",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = CallAmber

@@ -42,6 +42,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.example.data.model.AppCategory
+import com.example.ui.components.BluetoothAppSelectorHeader
+import com.example.ui.components.BluetoothAppSelectorItem
 import com.example.ui.components.BluetoothDeviceCard
 import com.example.ui.theme.CallAmber
 import com.example.ui.theme.DarkSurface
@@ -62,7 +76,7 @@ fun BluetoothDevicesScreen(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // Paired Devices Card
         item {
@@ -121,6 +135,131 @@ fun BluetoothDevicesScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Sound Settings", fontSize = 12.sp, color = TextPrimary)
                 }
+            }
+        }
+
+        // Dedicated Bluetooth Per-App Sound Routing Section
+        item {
+            BluetoothAppSelectorHeader(
+                uiState = uiState,
+                viewModel = viewModel
+            )
+        }
+
+        // Search in Bluetooth Apps
+        item {
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("bt_app_search_field"),
+                placeholder = { Text("Search installed apps for Bluetooth...", color = TextMuted, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = TextSecondary
+                    )
+                },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear", tint = TextSecondary)
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ElectricCyan,
+                    unfocusedBorderColor = Color(0xFF1F2937),
+                    focusedContainerColor = Color(0xFF0F172A),
+                    unfocusedContainerColor = Color(0xFF0F172A),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                )
+            )
+        }
+
+        // Category Filter Chips
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.selectedCategory == null,
+                    onClick = { viewModel.setCategoryFilter(null) },
+                    label = { Text("All (${uiState.appRules.size})", fontSize = 12.sp) },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ElectricCyan,
+                        selectedLabelColor = Color(0xFF0A0E17),
+                        containerColor = Color(0xFF0F172A),
+                        labelColor = TextSecondary
+                    )
+                )
+
+                AppCategory.values().forEach { cat ->
+                    val count = uiState.appRules.count { it.category == cat }
+                    if (count > 0) {
+                        FilterChip(
+                            selected = uiState.selectedCategory == cat,
+                            onClick = { viewModel.setCategoryFilter(if (uiState.selectedCategory == cat) null else cat) },
+                            label = { Text("${cat.label} ($count)", fontSize = 12.sp) },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = when (cat) {
+                                    AppCategory.MUSIC -> ElectricCyan
+                                    AppCategory.COMMUNICATION -> CallAmber
+                                    else -> Color(0xFF38BDF8)
+                                },
+                                selectedLabelColor = Color(0xFF0A0E17),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = TextSecondary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // List of all installed apps for Bluetooth routing
+        if (uiState.filteredApps.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No matching apps found",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
+        } else {
+            items(uiState.filteredApps, key = { "bt_${it.packageName}" }) { rule ->
+                BluetoothAppSelectorItem(
+                    rule = rule,
+                    onToggle = { enableBt ->
+                        viewModel.toggleAppBluetoothRouting(rule.packageName, rule.appName, rule.category.name, enableBt)
+                    }
+                )
             }
         }
 

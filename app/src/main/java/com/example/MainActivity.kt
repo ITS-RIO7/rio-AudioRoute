@@ -64,6 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import com.example.ui.screens.AppRulesScreen
 import com.example.ui.screens.BluetoothDevicesScreen
 import com.example.ui.screens.DashboardScreen
@@ -155,24 +157,17 @@ fun MainScreen(viewModel: MainViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = R.drawable.rio_speaker_icon_1789439904934),
+                            contentDescription = "rio AudioRouter Logo",
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(ElectricCyan.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Headphones,
-                                contentDescription = null,
-                                tint = ElectricCyan,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Sound Router",
+                                text = "rio AudioRouter",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary

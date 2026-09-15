@@ -179,6 +179,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleAppBluetoothRouting(packageName: String, appName: String, category: String, enableBluetooth: Boolean) {
+        val target = if (enableBluetooth) RouteTarget.BLUETOOTH else RouteTarget.SPEAKER
+        updateAppRule(packageName, appName, category, target)
+    }
+
+    fun setAllAppsBluetoothRouting(enableBluetooth: Boolean) {
+        val allApps = uiState.value.appRules
+        val target = if (enableBluetooth) RouteTarget.BLUETOOTH else RouteTarget.SPEAKER
+        viewModelScope.launch {
+            repository.setAllAppsTarget(allApps, target)
+        }
+    }
+
+    fun setMusicOnlyBluetoothRouting() {
+        val allApps = uiState.value.appRules
+        viewModelScope.launch {
+            // Set music apps to Bluetooth, others to Speaker
+            val musicTargets = allApps.filter { it.category == AppCategory.MUSIC }
+            val otherTargets = allApps.filter { it.category != AppCategory.MUSIC }
+            repository.applyBatchCategoryTarget(AppCategory.MUSIC, RouteTarget.BLUETOOTH, allApps)
+            for (rule in otherTargets) {
+                repository.updateAppRule(rule.packageName, rule.appName, rule.category.name, RouteTarget.SPEAKER)
+            }
+        }
+    }
+
     fun batchSetCategory(category: AppCategory, target: RouteTarget) {
         val allApps = uiState.value.appRules
         viewModelScope.launch {

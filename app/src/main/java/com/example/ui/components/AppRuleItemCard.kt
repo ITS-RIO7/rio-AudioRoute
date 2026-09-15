@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
@@ -188,6 +190,23 @@ fun AppRuleItemCard(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Quick Bluetooth Switch
+                Switch(
+                    checked = rule.routeTarget == RouteTarget.BLUETOOTH,
+                    onCheckedChange = { isBt ->
+                        onSelectTarget(if (isBt) RouteTarget.BLUETOOTH else RouteTarget.SPEAKER)
+                    },
+                    modifier = Modifier.testTag("app_rule_switch_${rule.packageName}"),
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = ElectricCyan,
+                        uncheckedThumbColor = Color.Gray,
+                        uncheckedTrackColor = Color(0xFF1E293B)
+                    )
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

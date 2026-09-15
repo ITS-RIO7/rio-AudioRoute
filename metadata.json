@@ -1,5 +1,5 @@
 {
-  "name": "Sound Router",
+  "name": "rio AudioRouter",
   "description": "Route music and media to Bluetooth devices while sending phone calls and notifications to phone speakers, with per-app audio output rules.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

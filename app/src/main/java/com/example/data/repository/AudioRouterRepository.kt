@@ -74,6 +74,21 @@ class AudioRouterRepository(
         }
     }
 
+    suspend fun setAllAppsTarget(allApps: List<AppAudioRule>, target: RouteTarget) {
+        withContext(Dispatchers.IO) {
+            val targets = allApps.map {
+                AppRuleEntity(
+                    packageName = it.packageName,
+                    appName = it.appName,
+                    routeTarget = target.name,
+                    category = it.category.name,
+                    isCustom = true
+                )
+            }
+            appRuleDao.insertRules(targets)
+        }
+    }
+
     suspend fun applyBatchCategoryTarget(category: AppCategory, target: RouteTarget, allApps: List<AppAudioRule>) {
         withContext(Dispatchers.IO) {
             val targets = allApps.filter { it.category == category }.map {

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Sound Router"
+rootProject.name = "rio AudioRouter"
 
 include(":app")
