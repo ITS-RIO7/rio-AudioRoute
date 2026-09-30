@@ -182,8 +182,8 @@ fun AppRuleItemCard(
                         )
 
                         Text(
-                            text = rule.packageName,
-                            fontSize = 11.sp,
+                            text = rule.audioReason,
+                            fontSize = 10.sp,
                             color = TextMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

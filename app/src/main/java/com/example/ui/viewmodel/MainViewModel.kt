@@ -11,6 +11,7 @@ import com.example.audio.AudioTestPlayer
 import com.example.data.db.AppDatabase
 import com.example.data.model.AppAudioRule
 import com.example.data.model.AppCategory
+import com.example.data.model.AudioFocusStatus
 import com.example.data.model.AudioHardwareStatus
 import com.example.data.model.AudioStreamConfig
 import com.example.data.model.BluetoothDeviceInfo
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -34,8 +36,10 @@ data class MainUiState(
     val searchQuery: String = "",
     val selectedCategory: AppCategory? = null,
     val isMusicTestPlaying: Boolean = false,
+    val isSpeakerTestPlaying: Boolean = false,
     val isCallToneTestPlaying: Boolean = false,
     val isServiceRunning: Boolean = false,
+    val onlyAudioApps: Boolean = true,
     val selectedTab: Int = 0 // 0: Dashboard, 1: Apps, 2: Bluetooth Devices
 )
 
@@ -52,6 +56,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedCategory = MutableStateFlow<AppCategory?>(null)
     val selectedCategory: StateFlow<AppCategory?> = _selectedCategory.asStateFlow()
 
+    private val _onlyAudioApps = MutableStateFlow(true)
+    val onlyAudioApps: StateFlow<Boolean> = _onlyAudioApps.asStateFlow()
+
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
@@ -61,17 +68,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isServiceRunning = MutableStateFlow(AudioRouterService.isRunning)
     val isServiceRunning: StateFlow<Boolean> = _isServiceRunning.asStateFlow()
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val appRulesFlow = _onlyAudioApps.flatMapLatest { onlyAudio ->
+        repository.getInstalledRules(onlyAudioApps = onlyAudio)
+    }
+
     val uiState: StateFlow<MainUiState> = combine(
         repository.routerSettings,
         repository.hardwareStatus,
-        repository.appRules,
+        appRulesFlow,
         _searchQuery,
         _selectedCategory,
         _bluetoothDevices,
         testPlayer.isMusicPlaying,
+        testPlayer.isSpeakerTestPlaying,
         testPlayer.isCallTonePlaying,
         _selectedTab,
-        _isServiceRunning
+        _isServiceRunning,
+        _onlyAudioApps
     ) { params ->
         val settings = params[0] as AudioStreamConfig
         val hardware = params[1] as AudioHardwareStatus
@@ -80,9 +94,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val cat = params[4] as? AppCategory
         val btDevices = params[5] as List<BluetoothDeviceInfo>
         val isMusicTest = params[6] as Boolean
-        val isCallTest = params[7] as Boolean
-        val tab = params[8] as Int
-        val serviceRunning = params[9] as Boolean
+        val isSpeakerTest = params[7] as Boolean
+        val isCallTest = params[8] as Boolean
+        val tab = params[9] as Int
+        val serviceRunning = params[10] as Boolean
+        val onlyAudio = params[11] as Boolean
 
         val filtered = allApps.filter { rule ->
             val matchesQuery = query.isEmpty() ||
@@ -101,8 +117,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             searchQuery = query,
             selectedCategory = cat,
             isMusicTestPlaying = isMusicTest,
+            isSpeakerTestPlaying = isSpeakerTest,
             isCallToneTestPlaying = isCallTest,
             isServiceRunning = serviceRunning,
+            onlyAudioApps = onlyAudio,
             selectedTab = tab
         )
     }.stateIn(
@@ -125,6 +143,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setCategoryFilter(category: AppCategory?) {
         _selectedCategory.value = category
+    }
+
+    fun toggleAudioOnlyAppsFilter() {
+        _onlyAudioApps.value = !_onlyAudioApps.value
     }
 
     fun refreshBluetoothDevices() {
@@ -195,10 +217,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setMusicOnlyBluetoothRouting() {
         val allApps = uiState.value.appRules
         viewModelScope.launch {
-            // Set music apps to Bluetooth, others to Speaker
-            val musicTargets = allApps.filter { it.category == AppCategory.MUSIC }
-            val otherTargets = allApps.filter { it.category != AppCategory.MUSIC }
             repository.applyBatchCategoryTarget(AppCategory.MUSIC, RouteTarget.BLUETOOTH, allApps)
+            val otherTargets = allApps.filter { it.category != AppCategory.MUSIC }
             for (rule in otherTargets) {
                 repository.updateAppRule(rule.packageName, rule.appName, rule.category.name, RouteTarget.SPEAKER)
             }
@@ -242,8 +262,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isServiceRunning.value = false
     }
 
-    fun playMusicTest() {
-        testPlayer.playMusicTest()
+    fun forceSpeakerOutput(force: Boolean) {
+        routingManager.forceCommunicationToSpeaker(force)
+        repository.refreshStatus()
+    }
+
+    fun requestAudioFocus(forCommunication: Boolean = true) {
+        routingManager.requestAudioFocus(forCommunication)
+        repository.refreshStatus()
+    }
+
+    fun abandonAudioFocus() {
+        routingManager.abandonAudioFocus()
+        repository.refreshStatus()
+    }
+
+    fun playMusicTest(target: RouteTarget = RouteTarget.BLUETOOTH) {
+        testPlayer.playMusicTest(target)
+    }
+
+    fun playSpeakerOnlyTest() {
+        testPlayer.playSpeakerOnlyTest()
     }
 
     fun playCallTest() {
@@ -252,6 +291,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopAllTests() {
         testPlayer.stopMusicTest()
+        testPlayer.stopSpeakerOnlyTest()
         testPlayer.stopCallTest()
     }
 

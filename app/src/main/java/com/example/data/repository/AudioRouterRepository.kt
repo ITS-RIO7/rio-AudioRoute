@@ -38,10 +38,10 @@ class AudioRouterRepository(
         }
     }.flowOn(Dispatchers.IO)
 
-    val appRules: Flow<List<AppAudioRule>> = combine(
+    fun getInstalledRules(onlyAudioApps: Boolean = true): Flow<List<AppAudioRule>> = combine(
         appRuleDao.getAllRules()
     ) { dbRulesList ->
-        val installed = routingManager.getInstalledAppsWithRules()
+        val installed = routingManager.getInstalledAppsWithRules(onlyAudioApps)
         val dbMap = dbRulesList.first().associateBy { it.packageName }
 
         installed.map { app ->
@@ -59,6 +59,8 @@ class AudioRouterRepository(
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    val appRules: Flow<List<AppAudioRule>> = getInstalledRules(onlyAudioApps = true)
 
     suspend fun updateAppRule(packageName: String, appName: String, category: String, target: RouteTarget) {
         withContext(Dispatchers.IO) {

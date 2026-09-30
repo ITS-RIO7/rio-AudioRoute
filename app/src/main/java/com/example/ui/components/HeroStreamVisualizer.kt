@@ -164,7 +164,10 @@ fun HeroStreamVisualizer(
                 streamSubtitle = "Voice & communication stream",
                 targetIcon = Icons.Default.PhoneAndroid,
                 targetTitle = "Phone Built-in Speaker",
-                targetSubtitle = if (hardwareStatus.isCommunicationDeviceSpeaker) "Active on Speaker" else "Enforced on call",
+                targetSubtitle = if (hardwareStatus.isCommunicationDeviceSpeaker || hardwareStatus.isSpeakerphoneForced)
+                    "Routed to Speaker (${hardwareStatus.audioFocusStatus.label})"
+                else
+                    "Enforced on call (${hardwareStatus.audioFocusStatus.label})",
                 accentColor = CallAmber,
                 glowColor = AmberGlow,
                 isActive = settings.isDualRoutingActive,

@@ -170,7 +170,7 @@ fun StreamMatrixCard(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Background Audio Guard",
+                                text = "Foreground Service & Audio Focus Guard",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextPrimary
@@ -178,9 +178,9 @@ fun StreamMatrixCard(
                         }
                         Text(
                             text = if (isServiceRunning)
-                                "Actively maintaining split audio during background playback"
+                                "System audio focus & Bluetooth redirection active (calls directed to speaker)"
                             else
-                                "Run service to enforce call speaker routing across all apps",
+                                "Turn on foreground service to manage audio focus and route calls to phone speaker",
                             fontSize = 11.sp,
                             color = TextMuted
                         )

@@ -2,11 +2,13 @@ package com.example.audio
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
 import android.util.Log
+import com.example.data.model.RouteTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +25,7 @@ class AudioTestPlayer(
     private val routingManager: AudioRoutingManager
 ) {
     private val scope = CoroutineScope(Dispatchers.Default)
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private val _isMusicPlaying = MutableStateFlow(false)
     val isMusicPlaying: StateFlow<Boolean> = _isMusicPlaying.asStateFlow()
@@ -30,13 +33,23 @@ class AudioTestPlayer(
     private val _isCallTonePlaying = MutableStateFlow(false)
     val isCallTonePlaying: StateFlow<Boolean> = _isCallTonePlaying.asStateFlow()
 
+    private val _isSpeakerTestPlaying = MutableStateFlow(false)
+    val isSpeakerTestPlaying: StateFlow<Boolean> = _isSpeakerTestPlaying.asStateFlow()
+
     private var musicJob: Job? = null
     private var callJob: Job? = null
+    private var speakerJob: Job? = null
 
     private var musicTrack: AudioTrack? = null
     private var callTrack: AudioTrack? = null
+    private var speakerTrack: AudioTrack? = null
 
-    fun playMusicTest() {
+    /**
+     * Plays music synth audio with explicit device routing.
+     * When target is SPEAKER: routes to built-in speaker even if Bluetooth is connected!
+     * When target is BLUETOOTH: routes to connected Bluetooth headset/speaker.
+     */
+    fun playMusicTest(target: RouteTarget = RouteTarget.BLUETOOTH) {
         if (_isMusicPlaying.value) {
             stopMusicTest()
             return
@@ -70,6 +83,8 @@ class AudioTestPlayer(
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build()
 
+                applyTargetDevice(track, target)
+
                 musicTrack = track
                 track.play()
 
@@ -86,7 +101,6 @@ class AudioTestPlayer(
 
                     for (i in 0 until noteDurationSamples) {
                         val angle = 2.0 * Math.PI * i / (sampleRate / freq)
-                        // Warm synth envelope
                         val envelope = (1.0 - (i.toDouble() / noteDurationSamples)).coerceIn(0.0, 1.0)
                         val sample = (sin(angle) * 0.5 * envelope * Short.MAX_VALUE).toInt().toShort()
 
@@ -104,20 +118,78 @@ class AudioTestPlayer(
         }
     }
 
-    fun stopMusicTest() {
-        _isMusicPlaying.value = false
-        musicJob?.cancel()
-        musicJob = null
-        stopMusicInternal()
-    }
+    /**
+     * Specifically forces audio through the Phone Speaker,
+     * proving that audio CAN play on phone speaker even when Bluetooth is connected.
+     */
+    fun playSpeakerOnlyTest() {
+        if (_isSpeakerTestPlaying.value) {
+            stopSpeakerOnlyTest()
+            return
+        }
 
-    private fun stopMusicInternal() {
-        try {
-            musicTrack?.stop()
-            musicTrack?.release()
-        } catch (_: Exception) {}
-        musicTrack = null
-        _isMusicPlaying.value = false
+        // Enforce communication mode to speaker
+        routingManager.forceCommunicationToSpeaker(true)
+
+        _isSpeakerTestPlaying.value = true
+        speakerJob = scope.launch {
+            try {
+                val sampleRate = 44100
+                val minBufferSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+
+                val audioFormat = AudioFormat.Builder()
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .build()
+
+                val track = AudioTrack.Builder()
+                    .setAudioAttributes(audioAttributes)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(minBufferSize * 2)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+
+                // Explicitly set preferred device to built-in speaker
+                applyTargetDevice(track, RouteTarget.SPEAKER)
+
+                speakerTrack = track
+                track.play()
+
+                // Cheerful 3-tone chime for speaker test: 587Hz (D5), 880Hz (A5), 1174Hz (D6)
+                val chimeFrequencies = doubleArrayOf(587.33, 880.00, 1174.66)
+                var chimeIdx = 0
+                val chimeDuration = sampleRate / 3 // ~330ms per tone
+                val buffer = ShortArray(chimeDuration)
+
+                while (isActive && _isSpeakerTestPlaying.value) {
+                    val freq = chimeFrequencies[chimeIdx % chimeFrequencies.size]
+                    chimeIdx++
+
+                    for (i in 0 until chimeDuration) {
+                        val angle = 2.0 * Math.PI * i / (sampleRate / freq)
+                        val env = (1.0 - (i.toDouble() / chimeDuration)).coerceIn(0.0, 1.0)
+                        buffer[i] = (sin(angle) * 0.45 * env * Short.MAX_VALUE).toInt().toShort()
+                    }
+
+                    track.write(buffer, 0, buffer.size)
+                    delay(50)
+                }
+            } catch (e: Exception) {
+                Log.e("AudioTestPlayer", "Speaker test error: ${e.message}")
+            } finally {
+                stopSpeakerInternal()
+            }
+        }
     }
 
     fun playCallTest() {
@@ -157,6 +229,9 @@ class AudioTestPlayer(
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build()
 
+                // Explicitly set preferred device to built-in speaker
+                applyTargetDevice(track, RouteTarget.SPEAKER)
+
                 callTrack = track
                 track.play()
 
@@ -185,11 +260,72 @@ class AudioTestPlayer(
         }
     }
 
+    private fun applyTargetDevice(track: AudioTrack, target: RouteTarget) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val outputDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            when (target) {
+                RouteTarget.SPEAKER -> {
+                    val speakerDevice = outputDevices.firstOrNull {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    }
+                    if (speakerDevice != null) {
+                        track.preferredDevice = speakerDevice
+                    }
+                }
+                RouteTarget.BLUETOOTH -> {
+                    val btDevice = outputDevices.firstOrNull {
+                        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && it.type == AudioDeviceInfo.TYPE_BLE_HEADSET)
+                    }
+                    if (btDevice != null) {
+                        track.preferredDevice = btDevice
+                    }
+                }
+                RouteTarget.DEFAULT -> {
+                    track.preferredDevice = null
+                }
+            }
+        }
+    }
+
+    fun stopMusicTest() {
+        _isMusicPlaying.value = false
+        musicJob?.cancel()
+        musicJob = null
+        stopMusicInternal()
+    }
+
+    fun stopSpeakerOnlyTest() {
+        _isSpeakerTestPlaying.value = false
+        speakerJob?.cancel()
+        speakerJob = null
+        stopSpeakerInternal()
+    }
+
     fun stopCallTest() {
         _isCallTonePlaying.value = false
         callJob?.cancel()
         callJob = null
         stopCallInternal()
+    }
+
+    private fun stopMusicInternal() {
+        try {
+            musicTrack?.stop()
+            musicTrack?.release()
+        } catch (_: Exception) {}
+        musicTrack = null
+        _isMusicPlaying.value = false
+    }
+
+    private fun stopSpeakerInternal() {
+        try {
+            speakerTrack?.stop()
+            speakerTrack?.release()
+        } catch (_: Exception) {}
+        speakerTrack = null
+        _isSpeakerTestPlaying.value = false
     }
 
     private fun stopCallInternal() {
@@ -203,6 +339,7 @@ class AudioTestPlayer(
 
     fun release() {
         stopMusicTest()
+        stopSpeakerOnlyTest()
         stopCallTest()
     }
 }

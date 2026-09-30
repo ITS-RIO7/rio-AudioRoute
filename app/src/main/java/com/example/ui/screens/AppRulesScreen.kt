@@ -51,6 +51,7 @@ import com.example.ui.components.AppRuleItemCard
 import com.example.ui.theme.CallAmber
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.ElectricCyan
+import com.example.ui.theme.StatusGreen
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -266,7 +267,7 @@ fun AppRulesScreen(
             )
         }
 
-        // Category Filter Chips
+        // Category & Audio Filter Chips
         item {
             Row(
                 modifier = Modifier
@@ -274,6 +275,26 @@ fun AppRulesScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Audio Apps Only Toggle Chip
+                FilterChip(
+                    selected = uiState.onlyAudioApps,
+                    onClick = { viewModel.toggleAudioOnlyAppsFilter() },
+                    label = {
+                        Text(
+                            text = if (uiState.onlyAudioApps) "🎧 Audio Apps Only" else "📱 All Device Apps",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = StatusGreen,
+                        selectedLabelColor = Color(0xFF0A0E17),
+                        containerColor = Color(0xFF0F172A),
+                        labelColor = TextSecondary
+                    )
+                )
+
                 FilterChip(
                     selected = uiState.selectedCategory == null,
                     onClick = { viewModel.setCategoryFilter(null) },

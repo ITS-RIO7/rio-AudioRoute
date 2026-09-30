@@ -15,13 +15,22 @@ enum class AppCategory(val label: String) {
     OTHER("Other Apps")
 }
 
+enum class AudioFocusStatus(val label: String) {
+    FOCUS_GAINED("Focus Held"),
+    FOCUS_LOSS("Focus Lost"),
+    FOCUS_LOSS_TRANSIENT("Focus Paused"),
+    FOCUS_LOSS_DUCK("Audio Ducked"),
+    IDLE("Inactive")
+}
+
 data class AppAudioRule(
     val packageName: String,
     val appName: String,
     val routeTarget: RouteTarget = RouteTarget.DEFAULT,
     val category: AppCategory = AppCategory.OTHER,
     val isSystemApp: Boolean = false,
-    val hasAudioCapability: Boolean = true
+    val hasAudioCapability: Boolean = true,
+    val audioReason: String = "Media Playback"
 )
 
 data class BluetoothDeviceInfo(
@@ -49,5 +58,9 @@ data class AudioHardwareStatus(
     val isCommunicationDeviceSpeaker: Boolean = false,
     val currentCallState: String = "IDLE",
     val communicationDeviceName: String = "Default",
-    val audioMode: String = "NORMAL"
+    val audioMode: String = "NORMAL",
+    val audioFocusStatus: AudioFocusStatus = AudioFocusStatus.IDLE,
+    val isSpeakerphoneForced: Boolean = false,
+    val activeAudioRoute: RouteTarget = RouteTarget.DEFAULT,
+    val audioAppsCount: Int = 0
 )

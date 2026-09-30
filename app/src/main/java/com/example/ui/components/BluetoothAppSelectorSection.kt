@@ -325,10 +325,12 @@ fun BluetoothAppSelectorItem(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isBluetooth) "Sound: Bluetooth 🎧" else "Sound: Phone Speaker 🔊",
-                        fontSize = 11.sp,
+                        text = if (isBluetooth) "Bluetooth 🎧  •  ${rule.audioReason}" else "Phone Speaker 🔊  •  ${rule.audioReason}",
+                        fontSize = 10.sp,
                         fontWeight = if (isBluetooth) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isBluetooth) ElectricCyan else TextMuted
+                        color = if (isBluetooth) ElectricCyan else TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

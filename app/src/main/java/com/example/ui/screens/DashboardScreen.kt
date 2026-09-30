@@ -60,10 +60,15 @@ fun DashboardScreen(
         item {
             AudioTestCard(
                 isMusicPlaying = uiState.isMusicTestPlaying,
+                isSpeakerPlaying = uiState.isSpeakerTestPlaying,
                 isCallPlaying = uiState.isCallToneTestPlaying,
-                onPlayMusic = { viewModel.playMusicTest() },
+                hardwareStatus = uiState.hardwareStatus,
+                onPlayMusicBt = { viewModel.playMusicTest(com.example.data.model.RouteTarget.BLUETOOTH) },
+                onPlaySpeakerOnly = { viewModel.playSpeakerOnlyTest() },
                 onPlayCall = { viewModel.playCallTest() },
-                onStopAll = { viewModel.stopAllTests() }
+                onStopAll = { viewModel.stopAllTests() },
+                onToggleForceSpeaker = { viewModel.forceSpeakerOutput(!uiState.hardwareStatus.isSpeakerphoneForced) },
+                onRequestFocus = { viewModel.requestAudioFocus(true) }
             )
         }
     }
