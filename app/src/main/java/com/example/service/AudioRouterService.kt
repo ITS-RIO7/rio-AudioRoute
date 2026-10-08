@@ -5,11 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
@@ -25,16 +31,52 @@ import kotlinx.coroutines.launch
 
 /**
  * Foreground Service component to:
- * 1. Manage Audio Focus for the Android system.
- * 2. Handle audio redirection routing (e.g. splitting Bluetooth music & Phone speaker calls).
- * 3. Keep audio focus and routing alive in the background.
+ * 1. Manage Audio Focus and Redirection Routing for the Android system.
+ * 2. Keep audio split continuously active in Lock Screen (via WakeLock & public notification).
+ * 3. Auto-detect and route Bluetooth connections seamlessly in real-time.
+ * 4. Run non-stop from activation until explicit deactivation.
  */
 class AudioRouterService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var routingManager: AudioRoutingManager
+    private var wakeLock: PowerManager.WakeLock? = null
     private val channelId = "audio_router_service_channel"
     private val notificationId = 1001
+
+    private var isReceiverRegistered = false
+
+    // Auto-Bluetooth connection and reconnection broadcast receiver
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                    val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                    Log.d("AudioRouterService", "Bluetooth ACL Connected: ${device?.name}")
+                    // Automatically re-assert audio routing
+                    routingManager.refreshAudioStatus()
+                    routingManager.forceCommunicationToSpeaker(true)
+                    updateNotification()
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    Log.d("AudioRouterService", "Bluetooth ACL Disconnected")
+                    routingManager.refreshAudioStatus()
+                    updateNotification()
+                }
+                BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED,
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    routingManager.refreshAudioStatus()
+                    routingManager.forceCommunicationToSpeaker(true)
+                    updateNotification()
+                }
+            }
+        }
+    }
 
     companion object {
         const val ACTION_START = "ACTION_START"
@@ -54,6 +96,23 @@ class AudioRouterService : Service() {
         routingManager = AudioRoutingManager(applicationContext)
         createNotificationChannel()
 
+        // Acquire partial WakeLock to ensure audio routing and focus stay active on Lock Screen
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "rioAudioRouter:LockScreenWakeLock"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (e: Exception) {
+            Log.e("AudioRouterService", "Error acquiring WakeLock: ${e.message}")
+        }
+
+        // Register Bluetooth Auto-Connect event receiver
+        registerBluetoothReceiver()
+
         // Observe hardware status to refresh notification dynamically
         serviceScope.launch {
             routingManager.hardwareStatus.collectLatest {
@@ -61,6 +120,32 @@ class AudioRouterService : Service() {
                     updateNotification()
                 }
             }
+        }
+    }
+
+    private fun registerBluetoothReceiver() {
+        if (!isReceiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(bluetoothReceiver, filter, RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(bluetoothReceiver, filter)
+            }
+            isReceiverRegistered = true
+        }
+    }
+
+    private fun unregisterBluetoothReceiver() {
+        if (isReceiverRegistered) {
+            try {
+                unregisterReceiver(bluetoothReceiver)
+            } catch (_: Exception) {}
+            isReceiverRegistered = false
         }
     }
 
@@ -120,6 +205,16 @@ class AudioRouterService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        unregisterBluetoothReceiver()
+        wakeLock?.let {
+            if (it.isHeld) {
+                try {
+                    it.release()
+                } catch (_: Exception) {}
+            }
+        }
+        wakeLock = null
+
         routingManager.abandonAudioFocus()
         routingManager.resetRoutingToDefault()
         serviceScope.cancel()
@@ -133,9 +228,10 @@ class AudioRouterService : Service() {
             val channel = NotificationChannel(
                 channelId,
                 "Sound Router & Audio Focus Service",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Manages audio focus and routes audio between Bluetooth and Phone Speaker"
+                description = "Manages audio focus and split audio routing with Lock Screen & Auto-BT support"
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -176,20 +272,23 @@ class AudioRouterService : Service() {
         val status = routingManager.hardwareStatus.value
         val btName = status.connectedDeviceName ?: "No Bluetooth Connected"
         val isSpeaker = status.isSpeakerphoneForced || status.isCommunicationDeviceSpeaker
-        val routeText = if (isSpeaker) "🔊 Calls -> Phone Speaker" else "🎧 Calls -> Bluetooth"
+        val routeText = if (isSpeaker) "🔊 Calls: Phone Speaker" else "🎧 Calls: Bluetooth"
         val focusText = if (status.audioFocusStatus == AudioFocusStatus.FOCUS_GAINED) "🎯 Focus: Active" else "🎯 Focus: Standby"
 
-        val toggleLabel = if (isSpeaker) "Switch to BT" else "Switch Speaker"
+        val toggleLabel = if (isSpeaker) "Route BT" else "Route Speaker"
 
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Audio Router & Focus Active")
-            .setContentText("$routeText  |  $focusText")
-            .setSubText(btName)
+            .setContentTitle("🟢 ROUTER ACTIVE (Lock Screen & Auto-BT)")
+            .setContentText("🎵 Songs: $btName  |  $routeText")
+            .setSubText("Auto-BT & Lock Screen ON")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingOpen)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .addAction(android.R.drawable.ic_menu_rotate, toggleLabel, pendingToggle)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", pendingStop)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Deactivate", pendingStop)
             .build()
     }
 

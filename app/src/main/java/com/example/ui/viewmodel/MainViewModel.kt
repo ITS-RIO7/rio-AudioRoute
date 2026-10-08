@@ -157,12 +157,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleDualRouting() {
         val current = uiState.value.settings
-        val updated = current.copy(isDualRoutingActive = !current.isDualRoutingActive)
+        if (current.isDualRoutingActive && _isServiceRunning.value) {
+            deactivateRouterEngine()
+        } else {
+            activateRouterEngine()
+        }
+    }
+
+    fun activateRouterEngine() {
+        val current = uiState.value.settings
+        val updated = current.copy(isDualRoutingActive = true)
         viewModelScope.launch {
             repository.saveSettings(updated)
-            if (updated.isDualRoutingActive && !_isServiceRunning.value) {
-                startRoutingService()
-            }
+            startRoutingService()
+            refreshBluetoothDevices()
+        }
+    }
+
+    fun deactivateRouterEngine() {
+        val current = uiState.value.settings
+        val updated = current.copy(isDualRoutingActive = false)
+        viewModelScope.launch {
+            repository.saveSettings(updated)
+            stopRoutingService()
+            routingManager.resetRoutingToDefault()
+            refreshBluetoothDevices()
         }
     }
 

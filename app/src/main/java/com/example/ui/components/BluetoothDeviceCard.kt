@@ -98,7 +98,7 @@ fun BluetoothDeviceCard(
                             text = if (hardwareStatus.isBluetoothA2dpConnected)
                                 "Connected: ${hardwareStatus.connectedDeviceName ?: "Ready"}"
                             else
-                                "No Bluetooth device currently streaming",
+                                "No device connected • Auto-connect active when nearby",
                             fontSize = 12.sp,
                             color = if (hardwareStatus.isBluetoothA2dpConnected) StatusGreen else TextMuted
                         )

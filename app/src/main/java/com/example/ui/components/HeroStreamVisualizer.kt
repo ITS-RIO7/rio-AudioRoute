@@ -27,13 +27,18 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -54,6 +59,7 @@ import com.example.data.model.AudioStreamConfig
 import com.example.ui.theme.AmberGlow
 import com.example.ui.theme.CallAmber
 import com.example.ui.theme.CyanGlow
+import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.StatusGreen
@@ -68,10 +74,12 @@ fun HeroStreamVisualizer(
     onToggleDualRouting: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isRunning = settings.isDualRoutingActive && settings.isServiceRunning
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
+        initialValue = 0.96f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -87,7 +95,7 @@ fun HeroStreamVisualizer(
         colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
         border = androidx.compose.foundation.BorderStroke(
             1.5.dp,
-            if (settings.isDualRoutingActive) ElectricCyan.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.3f)
+            if (isRunning) StatusGreen.copy(alpha = 0.7f) else Color.Gray.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -95,7 +103,7 @@ fun HeroStreamVisualizer(
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            // Header with Master Switch
+            // Header with status indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -107,35 +115,149 @@ fun HeroStreamVisualizer(
                             modifier = Modifier
                                 .size(10.dp)
                                 .clip(CircleShape)
-                                .background(if (settings.isDualRoutingActive) StatusGreen else Color.Gray)
+                                .background(if (isRunning) StatusGreen else Color.Gray)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (settings.isDualRoutingActive) "DUAL AUDIO ROUTING ACTIVE" else "ROUTING PAUSED",
+                            text = if (isRunning) "ENGINE RUNNING NON-STOP" else "ROUTER INACTIVE",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.5.sp,
-                            color = if (settings.isDualRoutingActive) StatusGreen else TextMuted
+                            letterSpacing = 1.2.sp,
+                            color = if (isRunning) StatusGreen else TextMuted
                         )
                     }
                     Text(
                         text = "Split Audio Engine",
-                        fontSize = 20.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                 }
 
                 Switch(
-                    checked = settings.isDualRoutingActive,
+                    checked = isRunning,
                     onCheckedChange = { onToggleDualRouting() },
                     modifier = Modifier.testTag("master_dual_route_switch"),
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = ElectricCyan,
+                        checkedTrackColor = StatusGreen,
                         uncheckedTrackColor = Color(0xFF374151)
                     )
                 )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // THE MASTER ACTIVE / DEACTIVATE BUTTON (User Requirement: "Ek active botton do gese hi active kAre to gab tak deactivate nhi tab tak...")
+            Button(
+                onClick = onToggleDualRouting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .testTag("master_engine_active_button"),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRunning) Color(0xFFDC2626) else ElectricCyan
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PowerSettingsNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (isRunning) Color.White else Color(0xFF0A0E17)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isRunning) "DEACTIVATE SOUND ROUTER" else "ACTIVATE SOUND ROUTER",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp,
+                        color = if (isRunning) Color.White else Color(0xFF0A0E17)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Continuous Active Badges (Lock screen & Auto-BT proof)
+            if (isRunning) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF0B192C))
+                        .border(1.dp, StatusGreen.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = StatusGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Lock Screen Active: Screen lock hone par bhi audio alag alag bajega",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = StatusGreen
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.NearMe,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Auto-Bluetooth Reconnect: Bluetooth pass aate hi auto route hoga",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ElectricCyan
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = CallAmber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Audio Focus Protected: Deactivate karne tak background me chalta rahega",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CallAmber
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0F172A))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "Active button dabane par service background aur lock screen me lagatar chalegi, jab tak aap Deactivate nahi karenge.",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        lineHeight = 16.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -148,11 +270,11 @@ fun HeroStreamVisualizer(
                 streamSubtitle = "Media audio stream",
                 targetIcon = Icons.Default.BluetoothConnected,
                 targetTitle = hardwareStatus.connectedDeviceName ?: "Bluetooth Device",
-                targetSubtitle = if (hardwareStatus.isBluetoothA2dpConnected) "Connected (A2DP)" else "Ready to pair",
+                targetSubtitle = if (hardwareStatus.isBluetoothA2dpConnected) "Connected (A2DP)" else "Ready to auto-connect",
                 accentColor = ElectricCyan,
                 glowColor = CyanGlow,
-                isActive = settings.isDualRoutingActive,
-                pulseModifier = if (settings.isDualRoutingActive) Modifier.scale(pulseScale) else Modifier
+                isActive = isRunning,
+                pulseModifier = if (isRunning) Modifier.scale(pulseScale) else Modifier
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -167,10 +289,10 @@ fun HeroStreamVisualizer(
                 targetSubtitle = if (hardwareStatus.isCommunicationDeviceSpeaker || hardwareStatus.isSpeakerphoneForced)
                     "Routed to Speaker (${hardwareStatus.audioFocusStatus.label})"
                 else
-                    "Enforced on call (${hardwareStatus.audioFocusStatus.label})",
+                    "Enforced on call & lock screen",
                 accentColor = CallAmber,
                 glowColor = AmberGlow,
-                isActive = settings.isDualRoutingActive,
+                isActive = isRunning,
                 pulseModifier = Modifier
             )
         }
@@ -196,98 +318,69 @@ private fun StreamBranchCard(
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF0F172A))
             .border(
-                width = 1.dp,
-                color = if (isActive) accentColor.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(16.dp)
+                1.dp,
+                if (isActive) accentColor.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.06f),
+                RoundedCornerShape(16.dp)
             )
             .padding(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Source Stream
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+            // Source stream icon
+            Box(
+                modifier = pulseModifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = if (isActive) 0.2f else 0.08f)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = streamTitle,
-                        tint = accentColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = streamTitle,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        letterSpacing = 0.8.sp
-                    )
-                    Text(
-                        text = streamSubtitle,
-                        fontSize = 11.sp,
-                        color = TextMuted
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isActive) accentColor else TextMuted,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
-            // Glowing Arrow / Flow Connector
-            Text(
-                text = "➔",
-                fontSize = 18.sp,
-                color = if (isActive) accentColor else TextMuted,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
+            Spacer(modifier = Modifier.width(12.dp))
 
-            // Destination Device
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1.1f),
-                horizontalArrangement = Arrangement.End
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = streamTitle,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
+                    color = if (isActive) accentColor else TextMuted
+                )
+                Text(
+                    text = targetTitle,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Text(
+                    text = targetSubtitle,
+                    fontSize = 11.sp,
+                    color = TextSecondary
+                )
+            }
+
+            // Target destination icon
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF1E293B)),
+                contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = targetTitle,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = targetSubtitle,
-                        fontSize = 11.sp,
-                        color = if (isActive) accentColor else TextMuted
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .then(pulseModifier)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(accentColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = targetIcon,
-                        contentDescription = targetTitle,
-                        tint = accentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Icon(
+                    imageVector = targetIcon,
+                    contentDescription = null,
+                    tint = if (isActive) accentColor else TextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
